@@ -1,145 +1,191 @@
-# AI Project Starter
+# BenchFleet
 
-Et teknologineutralt starterkit til AI-assisteret softwareudvikling med Claude Code eller Codex.
+BenchFleet er en planlagt platform til automatisk registrering, benchmarking og
+vurdering af Windows-computere. En lokal Python-agent indsamler hardware- og
+OS-inventory, udfører reproducerbare CPU-, RAM- og diskbenchmarks og sender de rå
+resultater til en Django-backend. Her gemmes historikken, deterministiske scores
+beregnes, og IT-administratorer kan finde og sammenligne langsomme enheder.
 
-Målet er en fast, genbrugelig arbejdsmetode uden at låse projekter til en bestemt stack.
+> **Projektstatus:** Dokumentation og prototypeplan er godkendt, men produktkoden
+> er endnu ikke scaffoldet. Den aktive opgave er Task 001 i
+> [`docs/TASKS.md`](docs/TASKS.md). Kommandoerne nedenfor er derfor den planlagte
+> udviklingskontrakt og virker først, når Task 001 er implementeret.
 
-## Grundprincipper
+## Hvorfor BenchFleet?
 
-- Forstå problemet og definér MVP før implementering.
-- Vælg teknologistak ud fra projektets faktiske behov.
-- Django er en præference, ikke et krav.
-- Hvis Django vælges, skal SaaS Pegasus vurderes som foretrukket udgangspunkt.
-- Hold databasen simpel: vurder SQLite først, derefter Supabase, og traditionel PostgreSQL først når det er nødvendigt.
-- Docker er ikke standard. Foretræk native udvikling og managed services når det er robust.
-- Arbejd i små verificerbare tasks.
-- Test, kritisér og forbedr faktisk output.
-- Undgå overengineering.
+Traditionelt hardware-inventory fortæller, hvad en computer indeholder, men ikke
+hvordan den faktisk performer. BenchFleet skal gøre forskellen målbar og hjælpe
+en tekniker med at besvare:
 
-## Struktur
+1. Hvilken hardware og Windows-version har computeren?
+2. Hvordan performer den under en ensartet, versionsstyret test?
+3. Er CPU, RAM eller disk den sandsynlige flaskehals?
+4. Hvordan klarer den sig mod andre computere i flåden?
+5. Hvilke enheder bør undersøges først?
+
+## Prototypeomfang
+
+Den første komplette prototype skal:
+
+- identificere en Windows-computer stabilt uden hostname som permanent nøgle
+- indsamle CPU-, RAM-, disk- og Windows-data
+- måle CPU single/multi, memory copy samt sekventiel disk read/write
+- uploade gennem et versioneret og device-autoriseret JSON API
+- bevare rå metrics og historik i SQLite
+- beregne versionsstyrede subsystem- og overall-scores
+- vise, sortere og sammenligne mindst to enheder
+- bevare færdige uploads i en lokal kø ved netværksfejl
+
+BenchFleet er i prototypefasen **ikke** MDM, endpoint security, software
+deployment, multi-tenant SaaS eller en erstatning for specialiserede benchmark-
+produkter. Se den fulde afgrænsning og acceptkriterier i
+[`docs/PRD.md`](docs/PRD.md).
+
+## Valgt arkitektur
+
+```text
+Windows PC
+┌──────────────────────────────────────────┐
+│ BenchFleet agent (Python CLI)            │
+│ identity → inventory → benchmark → queue │
+└───────────────────┬──────────────────────┘
+                    │ /api/v1/ JSON + device-token
+                    ▼
+┌──────────────────────────────────────────┐
+│ Django + Django REST Framework           │
+│ API → validering → scoring → Admin/UI    │
+└───────────────────┬──────────────────────┘
+                    │ Django ORM
+                    ▼
+                  SQLite
+```
+
+| Område | Prototypevalg |
+|---|---|
+| Backend | Python 3.12+, Django 5+, Django REST Framework |
+| Agent | Separat installérbar Python 3.12+ CLI til Windows |
+| Frontend | Django templates og Bootstrap; HTMX kun ved konkret behov |
+| Database | SQLite via Django ORM |
+| Adgang | Per-device token til API; Django authentication til administration |
+| Drift | Native installation på et lukket LAN |
+
+SaaS Pegasus er vurderet og bevidst fravalgt til prototypen, fordi teams,
+subscriptions og multi-tenancy ikke indgår i MVP. Docker, PostgreSQL, Redis,
+Celery og React tilføjes heller ikke uden et observeret behov. Begrundelser og
+genovervejelseskriterier findes i [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+og [`docs/DATABASE.md`](docs/DATABASE.md).
+
+## Roadmap
+
+Udviklingen følger **make it work → make it reliable → make it scalable**:
+
+1. **Fundament (aktuel):** implementeringsklar dokumentation og små tasks.
+2. **Agent → API → SQLite → Admin:** første registrering og inventory fra en
+   fysisk Windows-computer.
+3. **CPU-produktbevis:** to computere benchmarkes, scores og sammenlignes.
+4. **Komplet quick benchmark:** RAM/disk, offline queue og robust upload.
+5. **MVP-dashboard:** fleet summary, søgning, sortering og device detail.
+6. **Stabilisering/pilot**, derefter skalering alene efter målte behov.
+
+Den autoritative faseplan findes i [`docs/ROADMAP.md`](docs/ROADMAP.md), mens
+[`docs/TASKS.md`](docs/TASKS.md) altid indeholder den aktuelle arbejdsplan.
+
+## Planlagt lokal udvikling
+
+Task 001 skal etablere en reproducerbar native installation uden Docker. Når den
+er færdig, er det forventede backend-flow:
+
+```bash
+python -m venv .venv
+
+# Linux/macOS
+source .venv/bin/activate
+
+# Windows PowerShell
+# .venv\Scripts\Activate.ps1
+
+python -m pip install -r requirements.txt
+python manage.py migrate
+python manage.py check
+pytest
+python manage.py runserver 0.0.0.0:8000
+```
+
+Opret en administrator med `python manage.py createsuperuser`, når Django-
+scaffoldet findes. `runserver` er kun accepteret til lokal udvikling og en
+betroet prototype på lukket LAN; ekstern eksponering kræver produktionsserver,
+HTTPS, sikre settings og et deployment-review.
+
+Agentens installation og Windows-kommandoer dokumenteres, når agentpakken bliver
+oprettet i Task 006. Påkrævede CLI-kommandoer bliver `register`, `status`,
+`inventory`, `benchmark`, `upload` og `diagnose`.
+
+## Repositorystruktur
 
 ```text
 .
-├── AGENTS.md
-├── CHANGELOG.md
-├── CLAUDE.md
+├── AGENTS.md              # arbejdsinstruktioner til AI-agenter
+├── CLAUDE.md              # permanent udviklingsmetode og projektkommandoer
 ├── README.md
-├── VERSION
-├── .claude/
-│   └── commands/          # Claude Code slash commands (wrappers om prompts/)
 ├── docs/
-│   ├── PRD.md
-│   ├── ARCHITECTURE.md
-│   ├── DATABASE.md
-│   ├── ROADMAP.md
-│   └── TASKS.md
-├── prompts/
-│   ├── PROJEKTIDE.md
-│   ├── START_FROM_TEMPLATE.md
-│   ├── NEXT_TASK.md
-│   ├── FIX_BUG.md
-│   └── REVIEW_PROJECT.md
-└── scripts/               # udfyldes når stacken er valgt
+│   ├── PRD.md             # produktkrav og Definition of Done
+│   ├── ARCHITECTURE.md    # stack, komponenter, flows og ADR'er
+│   ├── DATABASE.md        # databasevalg, model og dataintegritet
+│   ├── ROADMAP.md         # produktfaser og exit criteria
+│   └── TASKS.md           # aktiv, prioriteret arbejdsplan
+├── prompts/               # fælles workflows til alle AI-agenter
+└── .claude/commands/      # tynde Claude Code-wrappers om prompts/
 ```
 
-## Start et nyt projekt
+Den planlagte produktkode får Django-apps til `devices`, `benchmarks`, `scoring`,
+`api` og `dashboard` samt en isoleret pakke under `agent/`. Agenten må ikke
+importere Django-kode; komponenterne integrerer kun gennem `/api/v1/`.
 
-1. Klik `Use this template` på GitHub.
-2. Opret et nyt privat repository.
-3. Klon repositoryet lokalt og åbn det i VS Code.
-4. Start Claude Code eller Codex i projektets rodmappe.
-5. Beskriv din projektidé — brug gerne skabelonen i `prompts/PROJEKTIDE.md`, der stiller de systematiske spørgsmål (problem, målgruppe, arbejdsgange, referencer, ikke-mål, rammer).
-6. I Claude Code: kør `/start-from-template` efterfulgt af din projektidé. I Codex: kopiér `prompts/START_FROM_TEMPLATE.md` og indsæt din projektidé.
-7. Lad agenten gøre PRD, stackvalg, databasevalg, arkitektur, roadmap og første tasks klar før produktkode skrives.
-8. Brug derefter `/next-task` (eller `prompts/NEXT_TASK.md`) til den normale udviklingscyklus.
+## Arbejd på projektet
 
-## Beskriv projektidéen godt
+Repositoryet er optimeret til små, verificerbare ændringer med både mennesker og
+AI-agenter:
 
-Kvaliteten af PRD, MVP og teknologivalg afhænger direkte af hvor godt idéen er beskrevet.
+1. Læs [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md) og source-of-truth-
+   dokumenterne i `docs/`.
+2. Vælg næste ikke-blokerede `TODO` i `docs/TASKS.md`; arbejd normalt kun på én
+   task ad gangen.
+3. Undersøg eksisterende patterns og afklar dokumentationskonflikter før kode.
+4. Implementér det mindste robuste scope og test happy path, ugyldigt input,
+   permissions, edge cases og relevante business rules.
+5. Inspicér faktisk output, gennemgå diffen og opdatér dokumentationen, hvis en
+   beslutning eller kontrakt ændres.
+6. Markér først en task `DONE`, når dens acceptkriterier og projektets Definition
+   of Done er opfyldt.
 
-`prompts/PROJEKTIDE.md` er en copy-paste-klar skabelon med de spørgsmål en god projektbeskrivelse besvarer: problemet, hvem der har det, de vigtigste arbejdsgange, referencer til eksisterende produkter, ikke-mål, rammer, succeskriterier og dine egne åbne spørgsmål. Skabelonen handler bevidst om produktet, ikke om teknologi — stack og database vælges senere ud fra behovene.
+Brug [`prompts/NEXT_TASK.md`](prompts/NEXT_TASK.md) til normal udvikling,
+[`prompts/FIX_BUG.md`](prompts/FIX_BUG.md) til fejl og
+[`prompts/REVIEW_PROJECT.md`](prompts/REVIEW_PROJECT.md) til et helhedsreview. I
+Claude Code findes de som `/next-task`, `/fix-bug` og `/review-project`.
 
-Alle felter er valgfrie. En tynd beskrivelse er også okay: både `/start-from-template` og startprompten beder agenten stille de vigtigste opklarende spørgsmål, før MVP og teknologivalg fastlægges. Kører du `/start-from-template` helt uden idé, interviewer agenten dig ud fra skabelonens felter.
+## Source of truth
 
-## Slash commands i Claude Code
+Ved uoverensstemmelser skal konflikten beskrives eksplicit — der må ikke gættes:
 
-Templaten indeholder fire custom slash commands i `.claude/commands/`, så prompterne kan køres uden copy-paste:
+- `docs/PRD.md` ejer produktkrav, brugere, scope og succeskriterier.
+- `docs/ARCHITECTURE.md` ejer stack, komponentgrænser og driftsvalg.
+- `docs/DATABASE.md` ejer persistens, relationer og integritetsregler.
+- `docs/ROADMAP.md` ejer faser og milestones.
+- `docs/TASKS.md` ejer aktiv status, rækkefølge og task-acceptkriterier.
+- `CLAUDE.md` ejer den permanente udviklingsmetode.
 
-- `/start-from-template [projektidé]` — gør et nyt repository implementeringsklart ud fra din idé.
-- `/next-task` — implementér næste TODO task fra `docs/TASKS.md` efter arbejdsmetoden.
-- `/fix-bug [bugbeskrivelse]` — reproducér, ret og regressionstest en bug.
-- `/review-project` — kritisk helhedsreview af projektets tilstand, uden automatiske ændringer.
+## Sikkerhed og data
 
-Kommandoerne er bevidst tynde wrappers: hver kommandofil inliner den tilsvarende fil i `prompts/` via en `@prompts/...`-reference. `prompts/` er dermed source of truth — retter du en prompt, følger slash commanden automatisk med, og Codex-brugere kan bruge de samme prompts via copy-paste.
+- Device-token må aldrig logges eller commits og lagres kun som digest i
+  backend.
+- Et device må kun uploade til sit eget UUID; cross-device adgang skal testes.
+- MachineGuid og komplette payloads må ikke ukritisk skrives til logs.
+- BenchFleet indsamler ikke dokumenter, mail, browserhistorik, brugerfiler,
+  tastetryk eller screenshots.
+- HTTP accepteres kun på et betroet, lukket prototype-LAN; brug HTTPS før enhver
+  ekstern eksponering.
 
-Se `.claude/README.md` for hvordan kommandofilerne virker, og hvordan du tilføjer nye.
+## Licens
 
-## Hurtig copy paste prompt
-
-```text
-Dette repository er oprettet fra ai-project-starter templaten.
-
-Læs først AGENTS.md, CLAUDE.md og alle relevante filer i docs/.
-
-Brug repositoryets arbejdsmetode og teknologipræferencer som projektets styringsramme.
-
-Gør først projektet implementeringsklart. Forstå problemet, definér et realistisk MVP, vurder relevante teknologistacks, vælg den simpleste robuste database og udviklingsopsætning, og opdater PRD, arkitektur, databasebeskrivelse, roadmap og første tasks.
-
-Begynd ikke at implementere produktkode endnu.
-
-Hvis Django anbefales, skal SaaS Pegasus vurderes som foretrukket udgangspunkt. Hjælp mig med valg af den aktuelle Pegasus projektopsætning før generering.
-
-Hold database og drift simple. Vurder SQLite først, derefter Supabase, og traditionel PostgreSQL først hvis kravene gør det nødvendigt. Docker er ikke standard.
-
-Når implementeringen senere starter, arbejd task for task med faktisk output, tests, kritisk review og forbedring indtil acceptkriterierne er opfyldt.
-
-Min projektidé:
-
-[INDSÆT PROJEKTIDÉ HER]
-```
-
-Den komplette version findes i `prompts/START_FROM_TEMPLATE.md`. Brug gerne skabelonen i `prompts/PROJEKTIDE.md` til at formulere selve projektidéen, før du indsætter den.
-
-## Claude Code og Codex
-
-`CLAUDE.md` indeholder de detaljerede fælles arbejdsregler og er den primære instruktionsfil til Claude Code.
-
-`CLAUDE.md` er en permanent metodefil. Den afsluttes med to stackspecifikke sektioner, "Kommandoer" og "Arkitektur i denne kodebase", der udfyldes når stacken er valgt, fx via `/init`. Filen må ikke erstattes af genereret indhold.
-
-`AGENTS.md` er indgangen for Codex og peger videre til `CLAUDE.md` samt projektets dokumentation.
-
-Begge agenter kan derfor bruge den samme `docs/` struktur, de samme prompts og den samme taskbaserede udviklingsproces.
-
-## Dokumenternes roller
-
-- `AGENTS.md`: projektinstruktioner og indgang for Codex.
-- `CLAUDE.md`: detaljerede permanente arbejdsregler.
-- `docs/PRD.md`: produkt, brugere, krav og MVP.
-- `docs/ARCHITECTURE.md`: stack, komponenter, integrationer, udvikling og deployment.
-- `docs/DATABASE.md`: databasevalg, datamodel og relationer.
-- `docs/ROADMAP.md`: faser og milestones.
-- `docs/TASKS.md`: aktive, små og verificerbare opgaver.
-- `docs/TASKS_ARCHIVE.md`: afsluttede tasks fra tidligere milestones. Oprettes ved behov, så `TASKS.md` forbliver kort.
-- `prompts/PROJEKTIDE.md`: copy-paste-klar skabelon til at beskrive projektidéen systematisk.
-- `prompts/START_FROM_TEMPLATE.md`: anbefalet startprompt til et nyt repository fra templaten.
-- `prompts/NEXT_TASK.md`: normal udviklingscyklus.
-- `prompts/FIX_BUG.md`: bugfix-flow med reproduktion og regressionstest.
-- `prompts/REVIEW_PROJECT.md`: kritisk helhedsreview.
-- `.claude/commands/`: slash commands til Claude Code, tynde wrappers om `prompts/`.
-- `CHANGELOG.md`: ændringer i selve templaten pr. version.
-
-## Django og SaaS Pegasus
-
-Hvis Django viser sig at være den bedste løsning, skal agenten først vurdere SaaS Pegasus og den aktuelle projektgenerator. Den skal hjælpe med valg af den konkrete Pegasus opsætning og kun aktivere funktioner der løser et reelt behov.
-
-## Database og Docker
-
-Database er ikke fastlagt på forhånd. Vurderingsrækkefølgen er SQLite, Supabase, traditionel PostgreSQL og derefter andre løsninger ved konkrete behov.
-
-Docker er heller ikke standard. Foretrukken rækkefølge er native udvikling, managed services, Docker til enkelte services og først derefter fuld Docker opsætning.
-
-## Versionering
-
-Starterkittets version står i `VERSION`, og ændringerne pr. version står i `CHANGELOG.md`.
-
-Repositories oprettet fra templaten kan ikke automatisk trække opdateringer ind. Sammenlign dit projekts `VERSION` med changeloggen, og overfør manuelt de ændringer der er relevante.
+Der er endnu ikke tilføjet en licensfil. Projektet bør derfor betragtes som
+proprietært, indtil ejeren vælger og tilføjer en licens.
