@@ -313,8 +313,21 @@ Hvis `/init` køres, eller en agent vil dokumentere kommandoer og arkitektur i d
 
 ## Kommandoer
 
-Udfyldes når stacken er valgt: setup, start af udviklingsmiljø, tests, lint, migrations og andre daglige kommandoer.
+Stacken er valgt, men produktkoden er endnu ikke scaffoldet. De forventede kommandoer er:
+
+```bash
+python -m venv .venv
+python -m pip install -r requirements.txt
+python manage.py migrate
+python manage.py check
+pytest
+python manage.py runserver 0.0.0.0:8000
+```
+
+På Windows aktiveres miljøet med `.venv\Scripts\activate`. Kommandoerne verificeres og opdateres i Task 001; indtil da er de en planlagt kontrakt, ikke dokumentation for et eksisterende setup.
 
 ## Arkitektur i denne kodebase
 
-Udfyldes når stacken er valgt: valgt stack, overordnet struktur og de vigtigste patterns. Detaljer hører hjemme i `docs/ARCHITECTURE.md`; her står kun det en agent skal vide for at arbejde effektivt i kodebasen.
+BenchFleet bygges som et Python 3.12+ monorepo med en Django 5+/DRF-backend, SQLite, Django templates/Bootstrap/HTMX og en separat installérbar Windows-agent. Agenten må ikke importere Django-apps; integrationen sker kun gennem det versionerede `/api/v1/` JSON API.
+
+Planlagte Django-domæneapps er `devices`, `benchmarks`, `scoring`, `api` og `dashboard`; opret ikke yderligere apps uden et konkret behov. Gem altid rå benchmarkdata før afledte scores, hold benchmark- og scoreversioner adskilt, og brug Django ORM uden SQLite-specifik SQL. Ingen Docker, Redis, Celery, React eller PostgreSQL introduceres uden et observeret krav. Se `docs/ARCHITECTURE.md` og `docs/DATABASE.md` for detaljer.
